@@ -4,4 +4,8 @@ Juego base Simon dice para customizar luego.
 
 ## Getting Started
 
-Tiras un flutter run y ya ta
+Tiras un 
+flutter run 
+o
+flutter run -d windows
+y ya ta

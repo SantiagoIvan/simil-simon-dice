@@ -18,11 +18,11 @@ class CSVService implements SavePlayerService {
 
     // Header solo si el archivo no existe
     if (!exists) {
-      buffer.writeln('Nombre,Apellido,Telefono,Email');
+      buffer.writeln('Id,Nombre,Apellido,Telefono,Email');
     }
 
     buffer.writeln(
-      '${player.name},${player.lastName},${player.phone},${player.email}',
+      '${player.id},${player.name},${player.lastName},${player.phone},${player.email}',
     );
 
     await file.writeAsString(buffer.toString(), mode: FileMode.append);

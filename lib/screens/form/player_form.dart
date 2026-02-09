@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:simon_game/repository/player_repository.dart';
 import 'package:simon_game/services/save_player/save_player.dart';
 import '../../models/player.dart';
 import '../../services/save_player/excel_service.dart';
@@ -35,6 +36,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final player = Player(
+      id: PlayerRepository.getId(),
       name: _nameCtrl.text.trim(),
       lastName: _lastNameCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),

@@ -25,6 +25,7 @@ class ExcelService extends SavePlayerService {
 
       excel[_sheetName].appendRow([
         // Crea las columnas
+        TextCellValue('Id'),
         TextCellValue('Nombre'),
         TextCellValue('Apellido'),
         TextCellValue('Celular'),
@@ -33,6 +34,7 @@ class ExcelService extends SavePlayerService {
     }
 
     excel[_sheetName].appendRow([
+      TextCellValue(player.id.toString()),
       TextCellValue(player.name),
       TextCellValue(player.lastName),
       TextCellValue(player.phone),
