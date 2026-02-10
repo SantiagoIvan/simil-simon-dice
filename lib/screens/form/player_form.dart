@@ -5,6 +5,8 @@ import '../../models/player.dart';
 import '../../services/save_player/excel_service.dart';
 import '../menu/main_menu_screen.dart';
 import '../game/game.dart';
+import '../../db/game_elements.dart';
+import '../../models/game.dart';
 
 class PlayerFormScreen extends StatefulWidget {
   final SavePlayerService savePlayerService;
@@ -47,9 +49,10 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
 
     if (!mounted) return;
 
+    final game = Game(playerId: 1, elements: defaultGameElements);
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const GameScreen()),
+      MaterialPageRoute(builder: (_) => GameScreen(game: game)),
     );
   }
 
