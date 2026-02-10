@@ -7,6 +7,7 @@ class Game {
   bool gameEnded;
   int score;
   int speedRate;
+  bool playerTurn;
 
   /// Elementos disponibles para el juego (botones en pantalla)
   final List<GameElement> elements;
@@ -24,6 +25,7 @@ class Game {
     this.gameEnded = false,
     this.score = 0,
     this.speedRate = 1000,
+    this.playerTurn = false,
     List<int>? targetSequence,
     List<int>? playerSequence,
   }) : targetSequence = targetSequence ?? [],
