@@ -38,34 +38,55 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Future<void> _playSequence() async {
-    // TODO: animar highlight de cards
-    await Future.delayed(Duration(milliseconds: widget.game.speedRate));
+    setState(() {
+      widget.game.playerTurn = false;
+    });
+
+    for (int index in widget.game.targetSequence) {
+      setState(() {
+        _highlightedIndex = index;
+      });
+
+      // 🔊 reproducir sonido acá si querés
+
+      await Future.delayed(Duration(milliseconds: widget.game.speedRate));
+
+      setState(() {
+        _highlightedIndex = null;
+      });
+
+      await Future.delayed(const Duration(milliseconds: 250));
+    }
+
+    setState(() {
+      widget.game.playerTurn = true;
+    });
   }
 
   void _onElementPressed(GameElement element) {
-    if (widget.game.playerTurn) {
-      final isValid = _engine.validatePlayerInput(widget.game, element.id);
+    if (!widget.game.playerTurn) return;
 
-      if (!isValid) {
-        _onGameOver();
-        return;
-      }
+    final isValid = _engine.validatePlayerInput(widget.game, element.id);
 
-      if (_engine.isRoundCompleted(widget.game)) {
-        widget.game.playerTurn = false;
-
-        _engine.nextRound(widget.game);
-        _engine.generateNextStep(widget.game);
-
-        _playSequence().then((_) {
-          setState(() {
-            widget.game.playerTurn = true;
-          });
-        });
-      }
-
-      setState(() {});
+    if (!isValid) {
+      _onGameOver();
+      return;
     }
+
+    if (_engine.isRoundCompleted(widget.game)) {
+      widget.game.playerTurn = false;
+
+      _engine.nextRound(widget.game);
+      _engine.generateNextStep(widget.game);
+
+      _playSequence().then((_) {
+        setState(() {
+          widget.game.playerTurn = true;
+        });
+      });
+    }
+
+    setState(() {});
   }
 
   void _onGameOver() {
@@ -211,16 +232,42 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Widget _buildGameCard(GameElement element) {
-    return Card(
-      elevation: 6,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => _onElementPressed(element),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Image.asset(element.imageAsset, fit: BoxFit.contain),
+  Widget _buildGameCard(GameElement element, int index) {
+    final bool isHighlighted = _highlightedIndex == index;
+
+    return AnimatedScale(
+      scale: isHighlighted ? 1.1 : 1.0,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isHighlighted
+              ? [
+                  BoxShadow(
+                    color: element.color.withAlpha(150),
+                    blurRadius: 20,
+                    spreadRadius: 4,
+                  ),
+                ]
+              : [],
+        ),
+        child: Card(
+          elevation: isHighlighted ? 12 : 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: widget.game.playerTurn
+                ? () => _onElementPressed(element)
+                : null,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Image.asset(element.imageAsset, fit: BoxFit.contain),
+            ),
+          ),
         ),
       ),
     );
@@ -248,7 +295,7 @@ class _GameScreenState extends State<GameScreen> {
       ),
       itemCount: elements.length,
       itemBuilder: (context, index) {
-        return _buildGameCard(elements[index]);
+        return _buildGameCard(elements[index], index);
       },
     );
   }

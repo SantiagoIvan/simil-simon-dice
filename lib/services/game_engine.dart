@@ -22,12 +22,6 @@ class GameEngine {
     final int index = game.playerSequence.length - 1;
 
     if (game.playerSequence[index] != game.targetSequence[index]) {
-      print(
-        "comparing " +
-            game.playerSequence[index].toString() +
-            " with " +
-            game.targetSequence[index].toString(),
-      );
       game.gameEnded = true;
       return false;
     }
