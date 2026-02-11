@@ -49,7 +49,7 @@ class _PlayerFormScreenState extends State<PlayerFormScreen> {
 
     if (!mounted) return;
 
-    final game = Game(playerId: 1, elements: defaultGameElements);
+    final game = Game(playerId: player.id, elements: defaultGameElements);
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => GameScreen(game: game)),

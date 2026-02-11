@@ -13,10 +13,10 @@ class Game {
   final List<GameElement> elements;
 
   /// Secuencia correcta que debe reproducir el jugador
-  final List<int> targetSequence;
+  List<int> targetSequence;
 
   /// Secuencia ingresada por el jugador en la ronda actual
-  final List<int> playerSequence;
+  List<int> playerSequence;
 
   Game({
     required this.playerId,
@@ -30,4 +30,23 @@ class Game {
     List<int>? playerSequence,
   }) : targetSequence = targetSequence ?? [],
        playerSequence = playerSequence ?? [];
+
+  void reset() {
+    round = 1;
+    gameEnded = false;
+    score = 0;
+    speedRate = 1000;
+    playerTurn = false;
+    targetSequence = [];
+    playerSequence = [];
+  }
+
+  bool validateSequence() {
+    for (var i = 0; i < targetSequence.length; i++) {
+      if (targetSequence[i] != playerSequence[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
 }

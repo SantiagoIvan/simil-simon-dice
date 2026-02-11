@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:simon_game/models/game_element.dart';
+import 'package:simon_game/screens/menu/main_menu_screen.dart';
 import '../../models/game.dart';
+import '../../services/game_engine.dart';
 
 class GameScreen extends StatefulWidget {
   final Game game;
@@ -12,6 +14,152 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
+  final GameEngine _engine = GameEngine();
+  int? _highlightedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _startGame();
+  }
+
+  void _startGame() async {
+    _engine.generateNextStep(widget.game);
+    await _playSequence();
+
+    setState(() {
+      widget.game.playerTurn = true;
+    });
+  }
+
+  void _restart() {
+    widget.game.reset();
+    _startGame();
+  }
+
+  Future<void> _playSequence() async {
+    // TODO: animar highlight de cards
+    await Future.delayed(Duration(milliseconds: widget.game.speedRate));
+  }
+
+  void _onElementPressed(GameElement element) {
+    if (widget.game.playerTurn) {
+      final isValid = _engine.validatePlayerInput(widget.game, element.id);
+
+      if (!isValid) {
+        _onGameOver();
+        return;
+      }
+
+      if (_engine.isRoundCompleted(widget.game)) {
+        widget.game.playerTurn = false;
+
+        _engine.nextRound(widget.game);
+        _engine.generateNextStep(widget.game);
+
+        _playSequence().then((_) {
+          setState(() {
+            widget.game.playerTurn = true;
+          });
+        });
+      }
+
+      setState(() {});
+    }
+  }
+
+  void _onGameOver() {
+    final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: SizedBox(
+          width: screenWidth * 0.5, // 🔑 50% del ancho
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'GAME OVER',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Score final: ${widget.game.score}',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _restart();
+                    },
+                    child: const Text('REINTENTAR'),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.secondary,
+                      foregroundColor: theme.colorScheme.onSecondary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (_) => const MainMenuScreen(),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                    child: const Text('MENÚ PRINCIPAL'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -52,7 +200,7 @@ class _GameScreenState extends State<GameScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Center(
         child: Text(
-          widget.game.playerTurn ? 'Tu turno' : '¡Mirá!',
+          widget.game.playerTurn ? 'Tu turno' : '¡Mirá la secuencia!',
           style: theme.textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.w600,
             letterSpacing: 1.2,
@@ -69,9 +217,7 @@ class _GameScreenState extends State<GameScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          // TODO: _onElementPressed(element)
-        },
+        onTap: () => _onElementPressed(element),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Image.asset(element.imageAsset, fit: BoxFit.contain),
