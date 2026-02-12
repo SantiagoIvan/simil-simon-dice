@@ -1,29 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:simon_game/models/game_element.dart';
 import 'package:simon_game/screens/menu/main_menu_screen.dart';
+import 'package:simon_game/services/audio/audio_service.dart';
 import '../../models/game.dart';
 import '../../services/game_engine.dart';
+import 'package:vibration/vibration.dart';
 
 class GameScreen extends StatefulWidget {
   final Game game;
+  final AudioService _audioService = AudioService();
 
-  const GameScreen({super.key, required this.game});
+  GameScreen({super.key, required this.game});
 
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen>
+    with SingleTickerProviderStateMixin {
   final GameEngine _engine = GameEngine();
   int? _highlightedIndex;
+
+  late AnimationController _titleController;
+  late Animation<double> _titleScale;
 
   @override
   void initState() {
     super.initState();
+
+    _titleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+
+    _titleScale = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _titleController, curve: Curves.easeInOut),
+    );
+
+    _titleController.repeat(reverse: true); // 🔁 LOOP INFINITO
+
     _startGame();
   }
 
-  void _startGame() async {
+  Future<void> _startGame() async {
     _engine.generateNextStep(widget.game);
     await _playSequence();
 
@@ -43,11 +62,11 @@ class _GameScreenState extends State<GameScreen> {
     });
 
     for (int index in widget.game.targetSequence) {
+      final element = widget.game.elements[index];
+
       setState(() {
         _highlightedIndex = index;
       });
-
-      // 🔊 reproducir sonido acá si querés
 
       await Future.delayed(Duration(milliseconds: widget.game.speedRate));
 
@@ -63,7 +82,7 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
-  void _onElementPressed(GameElement element) {
+  void _onElementPressed(GameElement element) async {
     if (!widget.game.playerTurn) return;
 
     final isValid = _engine.validatePlayerInput(widget.game, element.id);
@@ -79,19 +98,16 @@ class _GameScreenState extends State<GameScreen> {
       _engine.nextRound(widget.game);
       _engine.generateNextStep(widget.game);
 
-      _playSequence().then((_) {
-        setState(() {
-          widget.game.playerTurn = true;
-        });
-      });
+      await _playSequence();
     }
 
     setState(() {});
   }
 
-  void _onGameOver() {
+  void _onGameOver() async {
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
+    await _triggerGameOverVibration();
 
     showDialog(
       context: context,
@@ -99,14 +115,14 @@ class _GameScreenState extends State<GameScreen> {
       builder: (_) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: SizedBox(
-          width: screenWidth * 0.5, // 🔑 50% del ancho
+          width: screenWidth * 0.5,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'GAME OVER',
+                  'Has perdido!',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -122,22 +138,10 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                 ),
                 const SizedBox(height: 28),
-
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: theme.colorScheme.onPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
                     onPressed: () {
                       Navigator.of(context).pop();
                       _restart();
@@ -150,17 +154,6 @@ class _GameScreenState extends State<GameScreen> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.secondary,
-                      foregroundColor: theme.colorScheme.onSecondary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
                     onPressed: () {
                       Navigator.of(context).pop();
                       Navigator.of(context).pushAndRemoveUntil(
@@ -182,6 +175,12 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   @override
+  void dispose() {
+    _titleController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -193,10 +192,33 @@ class _GameScreenState extends State<GameScreen> {
             _buildTitle(theme),
             _buildScore(theme),
             const SizedBox(height: 16),
-
-            // 🔑 CLAVE: limitar altura del GridView
             Expanded(child: Center(child: _buildGameGrid())),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTitle(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Center(
+        child: ScaleTransition(
+          scale: _titleScale,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 150),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            child: Text(
+              widget.game.playerTurn ? 'Tu turno' : '¡Mirá la secuencia!',
+              key: ValueKey(widget.game.playerTurn),
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.2,
+                color: theme.colorScheme.onSurface.withAlpha(180),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -205,28 +227,10 @@ class _GameScreenState extends State<GameScreen> {
   Widget _buildScore(ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Center(
-        child: Text(
-          'Score: ${widget.game.score}',
-          style: theme.textTheme.headlineLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTitle(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Center(
-        child: Text(
-          widget.game.playerTurn ? 'Tu turno' : '¡Mirá la secuencia!',
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.2,
-            color: theme.colorScheme.onSurface.withAlpha(180),
-          ),
+      child: Text(
+        'Score: ${widget.game.score}',
+        style: theme.textTheme.headlineLarge?.copyWith(
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
@@ -255,6 +259,7 @@ class _GameScreenState extends State<GameScreen> {
         ),
         child: Card(
           elevation: isHighlighted ? 12 : 6,
+          clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -265,7 +270,11 @@ class _GameScreenState extends State<GameScreen> {
                 : null,
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Image.asset(element.imageAsset, fit: BoxFit.contain),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 150),
+                opacity: isHighlighted ? 0.9 : 1.0,
+                child: Image.asset(element.imageAsset, fit: BoxFit.contain),
+              ),
             ),
           ),
         ),
@@ -276,7 +285,7 @@ class _GameScreenState extends State<GameScreen> {
   int _calculateColumns(int total) {
     if (total <= 4) return 2;
     if (total <= 6) return 3;
-    return 4; // tablet landscape-friendly
+    return 4;
   }
 
   Widget _buildGameGrid() {
@@ -284,8 +293,8 @@ class _GameScreenState extends State<GameScreen> {
     final int crossAxisCount = _calculateColumns(elements.length);
 
     return GridView.builder(
-      shrinkWrap: true, // 🔑 clave
-      physics: const NeverScrollableScrollPhysics(), // 🔑 clave
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(24),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
@@ -294,9 +303,13 @@ class _GameScreenState extends State<GameScreen> {
         childAspectRatio: 1,
       ),
       itemCount: elements.length,
-      itemBuilder: (context, index) {
-        return _buildGameCard(elements[index], index);
-      },
+      itemBuilder: (context, index) => _buildGameCard(elements[index], index),
     );
+  }
+
+  Future<void> _triggerGameOverVibration() async {
+    if (await Vibration.hasVibrator() ?? false) {
+      Vibration.vibrate(pattern: [0, 80, 40, 80]);
+    }
   }
 }

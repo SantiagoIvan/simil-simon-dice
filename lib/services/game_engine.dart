@@ -9,7 +9,6 @@ class GameEngine {
     final randomElement = game.elements[_random.nextInt(game.elements.length)];
 
     game.targetSequence.add(randomElement.id);
-    print(game.targetSequence);
   }
 
   /// Valida el input del jugador
