@@ -8,7 +8,6 @@ import 'package:vibration/vibration.dart';
 
 class GameScreen extends StatefulWidget {
   final Game game;
-  final AudioService _audioService = AudioService();
 
   GameScreen({super.key, required this.game});
 
@@ -43,6 +42,10 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Future<void> _startGame() async {
+    await AudioService.preloadTones(
+      widget.game.elements.map((element) => element.audioAsset),
+    );
+
     _engine.generateNextStep(widget.game);
     await _playSequence();
 
@@ -64,16 +67,9 @@ class _GameScreenState extends State<GameScreen>
     for (int index in widget.game.targetSequence) {
       final element = widget.game.elements[index];
 
-      setState(() {
-        _highlightedIndex = index;
-      });
+      await _highlightElement(element, duration: widget.game.speedRate);
 
-      await Future.delayed(Duration(milliseconds: widget.game.speedRate));
-
-      setState(() {
-        _highlightedIndex = null;
-      });
-
+      // Agrego una pequenia espera al finalizar la secuencia
       await Future.delayed(const Duration(milliseconds: 250));
     }
 
@@ -92,9 +88,11 @@ class _GameScreenState extends State<GameScreen>
       return;
     }
 
-    if (_engine.isRoundCompleted(widget.game)) {
-      widget.game.playerTurn = false;
+    await _highlightElement(element);
 
+    if (_engine.isRoundCompleted(widget.game)) {
+      await Future.delayed(Duration(milliseconds: 250));
+      widget.game.playerTurn = false;
       _engine.nextRound(widget.game);
       _engine.generateNextStep(widget.game);
 
@@ -176,6 +174,7 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   void dispose() {
+    AudioService.dispose();
     _titleController.dispose();
     super.dispose();
   }
@@ -291,19 +290,36 @@ class _GameScreenState extends State<GameScreen>
   Widget _buildGameGrid() {
     final elements = widget.game.elements;
     final int crossAxisCount = _calculateColumns(elements.length);
+    const double spacing = 16;
+    const double outerPadding = 24;
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(24),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 1,
-      ),
-      itemCount: elements.length,
-      itemBuilder: (context, index) => _buildGameCard(elements[index], index),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double availableWidth = constraints.maxWidth - (outerPadding * 2);
+        final double tileSize =
+            (availableWidth - ((crossAxisCount - 1) * spacing)) /
+            crossAxisCount;
+
+        return SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.all(outerPadding),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: spacing,
+              runSpacing: spacing,
+              children: List.generate(
+                elements.length,
+                (index) => SizedBox(
+                  width: tileSize,
+                  height: tileSize,
+                  child: _buildGameCard(elements[index], index),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -311,5 +327,19 @@ class _GameScreenState extends State<GameScreen>
     if (await Vibration.hasVibrator() ?? false) {
       Vibration.vibrate(pattern: [0, 80, 40, 80]);
     }
+  }
+
+  Future<void> _highlightElement(GameElement element, {int? duration}) async {
+    setState(() {
+      _highlightedIndex = element.id;
+    });
+
+    await AudioService.playTone(element.audioAsset);
+    await Future.delayed(Duration(milliseconds: duration ?? 120));
+    await AudioService.stopTone(element.audioAsset);
+    setState(() {
+      _highlightedIndex = null;
+    });
+    return;
   }
 }
